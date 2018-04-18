@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modification>
+    <id>Order chat</id>
+    <version>18.04</version>
+    <vqmver required="true">2.6.0</vqmver>
+    <author>ulvbern (wolflirik@gmail.com)</author>
+
+    <!-- order_list -->
+    <file name="admin/view/template/sale/order_list.tpl">
+        <operation error="skip">
+            <search position="before"><![CDATA[<td class="left"><?php if ($sort == 'customer') { ?>]]></search>
+            <add><![CDATA[
+            <td>Чат</td>
+            ]]></add>
+        </operation>
+        <operation error="skip">
+            <search position="before"><![CDATA[<td><input type="text" name="filter_customer"]]></search>
+            <add><![CDATA[
+            <td></td>
+            ]]></add>
+        </operation>
+        <operation error="skip">
+            <search position="before"><![CDATA[<td class="left"><?php echo $order['customer']; ?></td>]]></search>
+            <add><![CDATA[
+            <td>
+            <?php if(isset($chats)){?>
+                <div class="chat" data-id="<?php echo $order['order_id']; ?>">
+                  <div class="messages" id="cn-<?php echo $order['order_id']; ?>">
+                  <?php foreach ($chats as $chat) { 
+                    if($chat['order_id']==$order['order_id']){ ?>
+                      <div class="message <?php echo $chat['important'] != 0 ? 'important':'';?>" id="mn-<?php echo $chat['id_message']; ?>" data-key="<?php echo $chat['id_message']; ?>">
+                        <h4 class="name" title="Отметить как важное"><?php echo $chat['name']; ?></h4>
+                        <span>/ <?php echo $chat['date_time']; ?></span>
+                        <p><?php echo $chat['message']; ?></p>
+						<?php if($chat['name'] == $logUser){ ?><span class="delete" title="удалить">[х]</span><?php } ?>
+                      </div>
+                    <?php }?>
+                  <?php }?>
+                  </div>
+                  <div class="send-form">
+                    <input class="important" type="checkbox" title="Отметить как важное"/>
+                    <input class="message" type="text" placeholder="message"/>
+                    <input class="send" type="button" value="ok"/>
+                  </div>
+                </div>
+                <?php } ?>
+                </td>
+            ]]></add>
+        </operation>
+        <operation error="skip">
+            <search position="before"><![CDATA[<?php echo $footer; ?>]]></search>
+            <add><![CDATA[
+<div class="coment_trigger_wrap"></div>
+<script type="text/javascript"><!--
+  var ws = new WebSocket("ws://localhost:8080"),
+      triggerWrap = $('.coment_trigger_wrap');
+
+  $('.messages').scrollTop(9999);
+
+  ws.onopen = function(){
+    console.log('соединение установлено!');
+  }
+
+  ws.onclose = function(e){
+    var text;
+    if(e.wasClean){
+      text = 'Соединение закрыто!';
+    }else{
+      text = 'Соединение закрыто с ошибкой!';
+    }
+    console.log(text+' Код:'+e.code);
+  }
+
+  ws.onmessage = function(e){
+    var message = JSON.parse(e.data);
+    switch(message.type){
+      case 'add':
+        var htmlMessage = '<div class="message '+(message.status?'important':'')+'" id="mn-'+message.id+'" data-key="'+message.id+'">';
+        htmlMessage += '<h4 class="name" title="Отметить как важное">'+message.author+'</h4>';
+        htmlMessage += '<span> / '+message.date+' </span>';
+        htmlMessage += '<p>'+message.text+' </p>';
+        htmlMessage += message.author == '<?php echo $logUser; ?>'?'<span class="delete" title="Удалить">[х]</span>':'';
+        htmlMessage += '</div>';
+        $('#cn-'+message.orderId).append(htmlMessage);
+        $('#cn-'+message.orderId).scrollTop(9999);
+        if(message.from == 1){
+          messageSound();
+          triggerWrap.append('<p class="new_comment '+(message.status?'important':'')+'" data-href="#order_'+message.orderId+'"><img src="view/image/add.png">Новый комментарий к товару №'+message.orderId+'</p>');
+          setTimeout(function(){
+            $('.new_comment').first().fadeOut(700, function(){$(this).remove()});
+          }, 9000);
+        }
+      break;
+      case 'update':
+        if(message.status)
+          $('#mn-'+message.id).addClass('important');
+        else
+          $('#mn-'+message.id).removeClass('important');
+      break;
+      case 'delete':
+        $('#mn-'+message.id).remove();
+      break;
+    }
+  }
+
+  ws.onerror = function(e){
+    alert('Ошибка соединения с сервером чата!');
+  }
+
+  $(document).on('click', '.send', function(){
+    var sendBox = $(this).parent(),
+        message = {
+          orderId: sendBox.parent().attr('data-id'),
+          type: 'add',
+          status: sendBox.find('.important').prop('checked'),
+          author:'<?php echo $logUser; ?>',
+          text: sendBox.find('.message').val()
+        };
+    if(sendBox.find('.message').val() == ''){
+		sendBox.find('.message').addClass('input-error');
+		setTimeout(function(){
+			sendBox.find('.message').removeClass('input-error');
+		},400);
+		return 0;
+	}
+    ws.send(JSON.stringify(message));
+    sendBox.find('.message').val('');
+    sendBox.find('.important').removeAttr("checked");
+  });
+
+  $(document).on('click', '.message .delete', function(){
+    var messageRow = $(this).parent(),
+        message = {
+          id:+messageRow.attr('data-key'),
+          type:'delete'
+        };
+    ws.send(JSON.stringify(message));
+  });
+
+  $(document).on('click', '.message .name',  function(){
+    var messageRow = $(this).parent(),
+        message = {
+          id:+messageRow.attr('data-key'),
+          type:'update',
+          status:!messageRow.hasClass('important')
+        };
+    ws.send(JSON.stringify(message));
+  });
+
+  $(document).on('click', '.new_comment', function(){
+	  var href = $(this).attr("data-href"),
+	      top = $('body').find(href);
+    if(top != null)
+      $("html").animate({scrollTop:top.offset().top}, 500, 'swing');
+	  $(this).fadeOut(500, function(){$(this).remove()});
+  });
+
+  var messageSound = function() {
+    var audio = new Audio();
+    audio.src = 'view/image/message.mp3'; 
+    audio.autoplay = true;
+  }
+//--></script> 
+            ]]></add>
+        </operation>
+	</file>
+
+    <!-- order_info -->
+    <file name="admin/view/template/sale/order_info.tpl">
+        <operation error="skip">
+            <search position="before"><![CDATA[<div class="vtabs">]]></search>
+            <add><![CDATA[
+            <div class="left-col">
+            ]]>
+            </add>
+        </operation>
+        <operation error="skip">
+            <search position="before"><![CDATA[<div id="tab-order" class="vtabs-content">]]></search>
+            <add><![CDATA[
+            <?php if(isset($chats)){?>
+      <div class="chat" data-id="<?php echo $order_id; ?>">
+        <div class="messages" id="cn-<?php echo $order_id; ?>">
+        <?php foreach ($chats as $chat) {
+            if($chat['order_id']==$order_id){ ?>
+            <div class="message <?php echo $chat['important'] != 0 ? 'important':'';?>" id="mn-<?php echo $chat['id_message']; ?>" data-key="<?php echo $chat['id_message']; ?>">
+              <h4 class="name" title="Отметить как важное"><?php echo $chat['name']; ?></h4>
+              <span>/ <?php echo $chat['date_time']; ?></span>
+              <p><?php echo $chat['message']; ?></p>
+              <?php if($chat['name'] == $logUser){ ?><span class="delete" title="Удалить">[х]</span><?php } ?>
+            </div>
+            <?php }?>
+          <?php }?>
+        </div>
+        <div class="send-form">
+          <input class="important" type="checkbox" title="Отметить как важное"/>
+          <input class="message" type="text" placeholder="message"/>
+          <input class="send" type="button" value="ok"/>
+        </div>
+      </div>
+      <?php } ?>
+      </div>]]>
+            </add>
+        </operation>
+        <operation error="skip">
+            <search position="before"><![CDATA[<?php echo $footer; ?>]]></search>
+            <add><![CDATA[
+<div class="coment_trigger_wrap"></div>
+<script type="text/javascript"><!--
+  var ws = new WebSocket("ws://localhost:8080"),
+      triggerWrap = $('.coment_trigger_wrap');
+
+  $('.messages').scrollTop(9999);
+
+  ws.onopen = function(){
+    console.log('соединение установлено!');
+  }
+
+  ws.onclose = function(e){
+    var text;
+    if(e.wasClean){
+      text = 'Соединение закрыто!';
+    }else{
+      text = 'Соединение закрыто с ошибкой!';
+    }
+    console.log(text+' Код:'+e.code);
+  }
+
+  ws.onmessage = function(e){
+    var message = JSON.parse(e.data);
+    switch(message.type){
+      case 'add':
+        var htmlMessage = '<div class="message '+(message.status?'important':'')+'" id="mn-'+message.id+'" data-key="'+message.id+'">';
+        htmlMessage += '<h4 class="name" title="Отметить как важное">'+message.author+'</h4>';
+        htmlMessage += '<span> / '+message.date+' </span>';
+        htmlMessage += '<p>'+message.text+' </p>';
+        htmlMessage += message.author == '<?php echo $logUser; ?>'?'<span class="delete" title="Удалить">[х]</span>':'';
+        htmlMessage += '</div>';
+        $('#cn-'+message.orderId).append(htmlMessage);
+        $('#cn-'+message.orderId).scrollTop(9999);
+        if(message.from == 1){
+          messageSound();
+          triggerWrap.append('<p class="new_comment '+(message.status?'important':'')+'" data-href="#order_'+message.orderId+'"><img src="view/image/add.png">Новый комментарий к товару №'+message.orderId+'</p>');
+          setTimeout(function(){
+            $('.new_comment').first().fadeOut(700, function(){$(this).remove()});
+          }, 9000);
+        }
+      break;
+      case 'update':
+        if(message.status)
+          $('#mn-'+message.id).addClass('important');
+        else
+          $('#mn-'+message.id).removeClass('important');
+      break;
+      case 'delete':
+        $('#mn-'+message.id).remove();
+      break;
+    }
+  }
+
+  ws.onerror = function(e){
+    alert('Ошибка соединения с сервером чата!');
+  }
+
+  $(document).on('click', '.send', function(){
+    var sendBox = $(this).parent(),
+        message = {
+          orderId: sendBox.parent().attr('data-id'),
+          type: 'add',
+          status: sendBox.find('.important').prop('checked'),
+          author:'<?php echo $logUser; ?>',
+          text: sendBox.find('.message').val()
+        };
+    if(sendBox.find('.message').val() == ''){
+		sendBox.find('.message').addClass('input-error');
+		setTimeout(function(){
+			sendBox.find('.message').removeClass('input-error');
+		},400);
+		return 0;
+	}
+    ws.send(JSON.stringify(message));
+    sendBox.find('.message').val('');
+    sendBox.find('.important').removeAttr("checked");
+  });
+
+  $(document).on('click', '.message .delete', function(){
+    var messageRow = $(this).parent(),
+        message = {
+          id:+messageRow.attr('data-key'),
+          type:'delete'
+        };
+    ws.send(JSON.stringify(message));
+  });
+
+  $(document).on('click', '.message .name',  function(){
+    var messageRow = $(this).parent(),
+        message = {
+          id:+messageRow.attr('data-key'),
+          type:'update',
+          status:!messageRow.hasClass('important')
+        };
+    ws.send(JSON.stringify(message));
+  });
+
+  $(document).on('click', '.new_comment', function(){
+	  var href = $(this).attr("data-href");
+	  $(this).fadeOut(500, function(){$(this).remove()});
+  });
+
+  var messageSound = function() {
+    var audio = new Audio();
+    audio.src = 'view/image/message.mp3'; 
+    audio.autoplay = true;
+  }
+//--></script> 
+            ]]></add>
+        </operation>
+	</file>
+
+    <!-- order model -->
+    <file name="admin/model/sale/order.php">
+        <operation error="skip">
+            <search position="after"><![CDATA[class ModelSaleOrder extends Model {]]></search>
+            <add><![CDATA[
+            public function getMessages($id = null) {
+		$sql = "SELECT `order_id`, `id_message`, `important`, `name`, `message`, `date_time` FROM `" . DB_PREFIX . "chat_for_order` WHERE `visibility` = 1";
+		if($id){
+			$sql .= " AND order_id = '".(int)$id."'";
+		}
+		$query = $this->db->query($sql);
+		return $query->rows;
+	}
+            ]]></add>
+        </operation>
+	</file>
+
+    <!-- order controller -->
+    <file name="admin/controller/sale/order.php">
+        <operation error="skip">
+            <search position="before"><![CDATA[public function index() {]]></search>
+            <add><![CDATA[
+            public function getmsg(){
+		$this->load->model('sale/order');
+		$results = $this->model_sale_order->getMessages();
+		$this->data['chats'] = array();
+		foreach ($results as $result) {
+        	$this->data['chats'][] = array(
+        		'id_message' => $result['id_message'],
+        		'important'  => $result['important'],
+        		'name'       => $result['name'],
+				'date_time'  => $result['date_time'],
+        		'message'    => $result['message'],
+        		'order_id'   => $result['order_id']
+        	);
+		}
+		
+		$this->response->setOutput($this->render());
+	}
+            ]]></add>
+        </operation>
+
+        <operation error="skip">
+            <search position="after" offset="5"><![CDATA[$this->template = 'sale/order_list.tpl';]]></search>
+            <add><![CDATA[
+            $this->data['logUser'] = $this->user->getUserName();
+            $this->document->addStyle('view/stylesheet/chat.css');
+            $this->getmsg();
+            ]]></add>
+        </operation>
+
+        <operation error="skip">
+            <search position="after"><![CDATA[$this->data['tab_fraud'] = $this->language->get('tab_fraud');]]></search>
+            <add><![CDATA[
+            $this->data['logUser'] = $this->user->getUserName();
+			$this->load->model('sale/order');
+			$results = $this->model_sale_order->getMessages($order_id);
+			$this->data['chats'] = array();
+			foreach ($results as $result) {
+				$this->data['chats'][] = array(
+					'id_message' => $result['id_message'],
+					'important'  => $result['important'],
+					'name'       => $result['name'],
+					'date_time'  => $result['date_time'],
+					'message'    => $result['message'],
+					'order_id'   => $result['order_id']
+				);
+			}
+            $this->document->addStyle('view/stylesheet/chat.css');
+            ]]></add>
+        </operation>
+	</file>
+
+</modification>
