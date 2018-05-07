@@ -12,7 +12,7 @@
       55</a> и 
     <a href="https://github.com/Wolflirik/OrderChat/blob/bb90345f7dc249b43d56afacb9e02fa9f4deb690/vqmod/xml/order_chat.xml#L209">209</a>;
   </li>
-  <li>Запустить командную строку на сервере и ввести следующее <i><b>nohup php -f /var/www/lightphotos/data/www/АДРЕС МАГАЗИНА/system/bin/chat-server.php > /dev/null 2>&1 &</b></i>.</li>
+  <li>Запустить командную строку на сервере и ввести следующее <i><b>nohup php -f /var/www/АДРЕС МАГАЗИНА/system/bin/chat-server.php > /dev/null 2>&1 &</b></i>.</li>
 </ol>
 <p>Проверялось на Opencart 1.5.4.1</p>
 <p>Будет работать на версиях меньше 2. Есть вопросы или предложения, пишите на почту.</p>
